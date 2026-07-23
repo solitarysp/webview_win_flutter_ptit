@@ -1,0 +1,43 @@
+name: Flutter Mobile Build ios
+
+on:
+  workflow_dispatch:
+
+env:
+  # IOS
+  ADMOB_IOS_BANNER_SETTINGS: ca-app-pub-xxxxxxxxxxxxxxxx/xxxxxxxxxx
+  ADMOB_IOS_BANNER_BACKUP: ca-app-pub-xxxxxxxxxxxxxxxx/xxxxxxxxxx
+  ADMOB_IOS_BANNER_ANALYTICS: ca-app-pub-xxxxxxxxxxxxxxxx/xxxxxxxxxx
+  ADMOB_IOS_BANNER_FAQ: ca-app-pub-xxxxxxxxxxxxxxxx/xxxxxxxxxx
+  ADMOB_IOS_BANNER_SESSION: ca-app-pub-xxxxxxxxxxxxxxxx/xxxxxxxxxx
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build iOS app (release, no codesign)
+        run: |
+          flutter build ios --release --no-codesign \
+            --dart-define=ADMOB_IOS_BANNER_SETTINGS=${ADMOB_IOS_BANNER_SETTINGS} \
+            --dart-define=ADMOB_IOS_BANNER_BACKUP=${ADMOB_IOS_BANNER_BACKUP} \
+            --dart-define=ADMOB_IOS_BANNER_ANALYTICS=${ADMOB_IOS_BANNER_ANALYTICS} \
+            --dart-define=ADMOB_IOS_BANNER_FAQ=${ADMOB_IOS_BANNER_FAQ} \
+            --dart-define=ADMOB_IOS_BANNER_SESSION=${ADMOB_IOS_BANNER_SESSION}
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app-release
+          path: build/ios/iphoneos/Runner.app

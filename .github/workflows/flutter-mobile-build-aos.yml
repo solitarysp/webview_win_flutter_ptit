@@ -1,0 +1,77 @@
+name: Flutter Mobile Build aos
+
+on:
+  workflow_dispatch:
+
+env:
+  # AOS
+  ADMOB_ANDROID_BANNER_SETTINGS: ca-app-pub-2258788047504639/3678515426
+  ADMOB_ANDROID_BANNER_BACKUP: ca-app-pub-2258788047504639/5055249651
+  ADMOB_ANDROID_BANNER_ANALYTICS: ca-app-pub-2258788047504639/2432955748
+  ADMOB_ANDROID_BANNER_FAQ: ca-app-pub-2258788047504639/2571427243
+  ADMOB_ANDROID_BANNER_SESSION: ca-app-pub-2258788047504639/8650879730
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java (Gradle cache)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Cache Pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate build number from timestamp
+        run: echo "BUILD_NUMBER=$(date +%s)" >> $GITHUB_ENV
+
+      - name: Build Android AAB (release)
+        run: |
+          flutter build appbundle --release \
+            --build-number=${BUILD_NUMBER} \
+            --dart-define=ADMOB_ANDROID_BANNER_SETTINGS=${ADMOB_ANDROID_BANNER_SETTINGS} \
+            --dart-define=ADMOB_ANDROID_BANNER_BACKUP=${ADMOB_ANDROID_BANNER_BACKUP} \
+            --dart-define=ADMOB_ANDROID_BANNER_ANALYTICS=${ADMOB_ANDROID_BANNER_ANALYTICS} \
+            --dart-define=ADMOB_ANDROID_BANNER_FAQ=${ADMOB_ANDROID_BANNER_FAQ} \
+            --dart-define=ADMOB_ANDROID_BANNER_SESSION=${ADMOB_ANDROID_BANNER_SESSION}
+      - name: Upload Android artifact AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-appbundle-release
+          path: build/app/outputs/bundle/release/app-release.aab
+      - name: Build Android APK
+        run: |
+          flutter build apk --release \
+            --build-number=${BUILD_NUMBER} \
+            --dart-define=ADMOB_ANDROID_BANNER_SETTINGS=${ADMOB_ANDROID_BANNER_SETTINGS} \
+            --dart-define=ADMOB_ANDROID_BANNER_BACKUP=${ADMOB_ANDROID_BANNER_BACKUP} \
+            --dart-define=ADMOB_ANDROID_BANNER_ANALYTICS=${ADMOB_ANDROID_BANNER_ANALYTICS} \
+            --dart-define=ADMOB_ANDROID_BANNER_FAQ=${ADMOB_ANDROID_BANNER_FAQ} \
+            --dart-define=ADMOB_ANDROID_BANNER_SESSION=${ADMOB_ANDROID_BANNER_SESSION}
+
+      - name: Upload Android artifact APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-release
+          path: build/app/outputs/flutter-apk/app-release.apk
