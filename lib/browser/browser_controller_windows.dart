@@ -6,6 +6,7 @@ import 'package:webview_windows/webview_windows.dart';
 
 import 'url_utils.dart';
 import 'web_clipboard_bridge.dart';
+import 'web_error_text.dart';
 
 class BrowserControllerWindows extends ChangeNotifier {
   BrowserControllerWindows({
@@ -51,6 +52,9 @@ class BrowserControllerWindows extends ChangeNotifier {
       _subscriptions.add(
         webviewController.loadingState.listen((state) {
           isLoading = state == LoadingState.loading;
+          if (isLoading) {
+            errorMessage = null;
+          }
           notifyListeners();
         }),
       );
@@ -63,16 +67,19 @@ class BrowserControllerWindows extends ChangeNotifier {
       );
       _subscriptions.add(
         webviewController.onLoadError.listen((status) {
-          errorMessage = 'Không tải được trang: $status';
+          isLoading = false;
+          errorMessage = buildWindowsWebLoadErrorMessage('$status');
           notifyListeners();
         }),
       );
 
+      isLoading = true;
       await webviewController.loadUrl(urlTextController.text);
       isInitialized = true;
       errorMessage = null;
       notifyListeners();
     } on PlatformException catch (e) {
+      isLoading = false;
       errorMessage = 'Lỗi khởi tạo WebView: ${e.message ?? e.code}';
       notifyListeners();
     }
@@ -81,9 +88,7 @@ class BrowserControllerWindows extends ChangeNotifier {
   Future<void> openInputUrl() async {
     final url = UrlUtils.normalizeUrl(urlTextController.text);
     urlTextController.text = url;
-    errorMessage = null;
-    notifyListeners();
-    await webviewController.loadUrl(url);
+    await _navigate(() => webviewController.loadUrl(url));
   }
 
   Future<void> goHome() async {
@@ -95,17 +100,17 @@ class BrowserControllerWindows extends ChangeNotifier {
     if (!canGoBack) {
       return;
     }
-    await webviewController.goBack();
+    await _navigate(webviewController.goBack);
   }
 
   Future<void> goForward() async {
     if (!canGoForward) {
       return;
     }
-    await webviewController.goForward();
+    await _navigate(webviewController.goForward);
   }
 
-  Future<void> reload() => webviewController.reload();
+  Future<void> reload() => _navigate(webviewController.reload);
 
   Future<String> copySelectionToClipboard() {
     return WebClipboardBridge.copySelectedText(
@@ -123,6 +128,20 @@ class BrowserControllerWindows extends ChangeNotifier {
     return WebClipboardBridge.pasteImageFromClipboard(
       runScript: webviewController.executeScript,
     );
+  }
+
+  Future<void> _navigate(Future<void> Function() action) async {
+    errorMessage = null;
+    isLoading = true;
+    notifyListeners();
+
+    try {
+      await action();
+    } on PlatformException catch (e) {
+      isLoading = false;
+      errorMessage = 'Không tải được trang: ${e.message ?? e.code}';
+      notifyListeners();
+    }
   }
 
   @override
