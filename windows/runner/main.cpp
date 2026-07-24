@@ -7,11 +7,13 @@
 
 namespace {
 
-constexpr ULONGLONG kDoubleShiftMaxIntervalMs = 400;
+constexpr ULONGLONG kDoubleCapsLockMaxIntervalMs = 400;
+constexpr ULONGLONG kCapsLockRepeatGuardMs = 40;
+constexpr ULONGLONG kCapsLockToggleCooldownMs = 250;
 HWND g_main_window = nullptr;
 HHOOK g_keyboard_hook = nullptr;
-bool g_shift_down = false;
-ULONGLONG g_last_shift_down_tick = 0;
+ULONGLONG g_last_caps_lock_down_tick = 0;
+ULONGLONG g_ignore_caps_lock_until_tick = 0;
 
 void BringWindowToFront(HWND hwnd) {
   if (!hwnd) {
@@ -51,22 +53,23 @@ void ToggleMainWindow(HWND hwnd) {
 LRESULT CALLBACK KeyboardProc(int n_code, WPARAM w_param, LPARAM l_param) {
   if (n_code == HC_ACTION) {
     auto* keyboard = reinterpret_cast<KBDLLHOOKSTRUCT*>(l_param);
-    const bool is_shift =
-        keyboard->vkCode == VK_LSHIFT || keyboard->vkCode == VK_RSHIFT;
+    const bool is_caps_lock = keyboard->vkCode == VK_CAPITAL;
 
-    if (is_shift) {
-      if (w_param == WM_KEYDOWN || w_param == WM_SYSKEYDOWN) {
-        if (!g_shift_down) {
-          ULONGLONG now = GetTickCount64();
-          if (g_last_shift_down_tick != 0 &&
-              now - g_last_shift_down_tick <= kDoubleShiftMaxIntervalMs) {
-            ToggleMainWindow(g_main_window);
-          }
-          g_last_shift_down_tick = now;
-          g_shift_down = true;
-        }
-      } else if (w_param == WM_KEYUP || w_param == WM_SYSKEYUP) {
-        g_shift_down = false;
+    if (is_caps_lock && (w_param == WM_KEYDOWN || w_param == WM_SYSKEYDOWN)) {
+      ULONGLONG now = GetTickCount64();
+      if (now < g_ignore_caps_lock_until_tick) {
+        return CallNextHookEx(nullptr, n_code, w_param, l_param);
+      }
+
+      const ULONGLONG elapsed =
+          g_last_caps_lock_down_tick == 0 ? 0 : now - g_last_caps_lock_down_tick;
+      if (elapsed >= kCapsLockRepeatGuardMs &&
+          elapsed <= kDoubleCapsLockMaxIntervalMs) {
+        ToggleMainWindow(g_main_window);
+        g_last_caps_lock_down_tick = 0;
+        g_ignore_caps_lock_until_tick = now + kCapsLockToggleCooldownMs;
+      } else {
+        g_last_caps_lock_down_tick = now;
       }
     }
   }
