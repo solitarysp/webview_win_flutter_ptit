@@ -31,6 +31,23 @@ void BringWindowToFront(HWND hwnd) {
   SetForegroundWindow(hwnd);
 }
 
+void ToggleMainWindow(HWND hwnd) {
+  if (!hwnd) {
+    return;
+  }
+
+  const bool is_visible = IsWindowVisible(hwnd) != FALSE;
+  const bool is_minimized = IsIconic(hwnd) != FALSE;
+  const bool is_foreground = GetForegroundWindow() == hwnd;
+
+  if (is_visible && !is_minimized && is_foreground) {
+    ShowWindow(hwnd, SW_HIDE);
+    return;
+  }
+
+  BringWindowToFront(hwnd);
+}
+
 LRESULT CALLBACK KeyboardProc(int n_code, WPARAM w_param, LPARAM l_param) {
   if (n_code == HC_ACTION) {
     auto* keyboard = reinterpret_cast<KBDLLHOOKSTRUCT*>(l_param);
@@ -43,7 +60,7 @@ LRESULT CALLBACK KeyboardProc(int n_code, WPARAM w_param, LPARAM l_param) {
           ULONGLONG now = GetTickCount64();
           if (g_last_shift_down_tick != 0 &&
               now - g_last_shift_down_tick <= kDoubleShiftMaxIntervalMs) {
-            BringWindowToFront(g_main_window);
+            ToggleMainWindow(g_main_window);
           }
           g_last_shift_down_tick = now;
           g_shift_down = true;
